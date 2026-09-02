@@ -1,7 +1,6 @@
 local Players = game:GetService("Players")
 local RS = game:GetService("RunService")
 local player = Players.LocalPlayer
-local camera = workspace.CurrentCamera
 local pGui = player:WaitForChild("PlayerGui")
 
 if pGui:FindFirstChild("HomeScraperUI") then
@@ -15,23 +14,29 @@ local function getChar()
     return char, root, hum
 end
 
--- Posiciones más cercanas a los hubs reales
+-- Solo islas del Sea 1
 local islands = {
-    {N = "Sea1 Pirate",   P = Vector3.new(-1245, 8, 3450)},
-    {N = "Sea1 Marine",   P = Vector3.new(-2605, 8, 2045)},
-    {N = "Sea1 Middle",   P = Vector3.new(-290, 8, 1580)},
-    {N = "Sea2 Cafe",     P = Vector3.new(-385, 73, 300)},
-    {N = "Sea2 Docks",    P = Vector3.new(80, 20, 2850)},
-    {N = "Sea3 Port",     P = Vector3.new(-610, 58, 6436)},
-    {N = "Sea3 Mansion",  P = Vector3.new(-12550, 337, -10450)},
-    {N = "Sea3 Castle",   P = Vector3.new(-5500, 314, -2800)},
+    {N = "Pirate Starter",     P = Vector3.new(-1245, 8, 3450)},
+    {N = "Marine Starter",     P = Vector3.new(-2605, 8, 2045)},
+    {N = "Middle Town",        P = Vector3.new(-290, 8, 1580)},
+    {N = "Jungle",             P = Vector3.new(-1600, 8, 150)},
+    {N = "Pirate Village",     P = Vector3.new(-1145, 8, 3820)},
+    {N = "Desert",             P = Vector3.new(1094, 8, 4190)},
+    {N = "Frozen Village",     P = Vector3.new(1198, 30, -1210)},
+    {N = "Marine Fortress",    P = Vector3.new(-4505, 20, 4260)},
+    {N = "Skylands",           P = Vector3.new(-4970, 720, -2620)},
+    {N = "Prison",             P = Vector3.new(4850, 8, 735)},
+    {N = "Colosseum",          P = Vector3.new(-1428, 8, -3014)},
+    {N = "Magma Village",      P = Vector3.new(-5290, 10, 8500)},
+    {N = "Underwater City",    P = Vector3.new(61150, 20, 1700)},
+    {N = "Fountain City",      P = Vector3.new(5250, 10, 4050)},
 }
 
 local results = {}
 local index = 1
 local isBusy = false
 
--- ==================== UI ====================
+-- UI
 local sg = Instance.new("ScreenGui", pGui)
 sg.Name = "HomeScraperUI"
 sg.ResetOnSpawn = false
@@ -40,13 +45,12 @@ local f = Instance.new("Frame", sg)
 f.Size = UDim2.new(0, 440, 0, 380)
 f.Position = UDim2.new(0.5, -220, 0.5, -190)
 f.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
-f.BackgroundTransparency = 0.1
 Instance.new("UICorner", f).CornerRadius = UDim.new(0, 10)
 
 local title = Instance.new("TextLabel", f)
 title.Size = UDim2.new(1, 0, 0, 34)
 title.BackgroundTransparency = 1
-title.Text = "Scraper Puntos Principales"
+title.Text = "Scraper Puntos - Sea 1"
 title.TextColor3 = Color3.new(1, 1, 1)
 title.Font = Enum.Font.GothamBold
 title.TextSize = 16
@@ -80,7 +84,6 @@ local function updateBox()
     box.Text = #results > 0 and table.concat(results, "\n\n") or "Sin datos todavía..."
 end
 
--- ==================== Lógica estilo tu fly script ====================
 local function setCollisions(char, enable)
     for _, part in ipairs(char:GetDescendants()) do
         if part:IsA("BasePart") then
@@ -114,7 +117,6 @@ local function safeGoTo(data)
     local char, root, hum = getChar()
     info.Text = "Yendo a " .. data.N
 
-    -- Crear parte temporal (igual que tu fly)
     local flightPart = Instance.new("Part")
     flightPart.Size = Vector3.new(4, 0.5, 4)
     flightPart.Transparency = 1
@@ -125,19 +127,15 @@ local function safeGoTo(data)
     flightPart.CFrame = CFrame.new(data.P + Vector3.new(0, 4, 0))
     flightPart.Parent = workspace
 
-    -- Estado físico
     hum.PlatformStand = true
     hum:ChangeState(Enum.HumanoidStateType.Physics)
     setCollisions(char, false)
 
-    -- Mover al jugador a la parte
     root.CFrame = flightPart.CFrame + Vector3.new(0, 2.8, 0)
     root.AssemblyLinearVelocity = Vector3.zero
     root.AssemblyAngularVelocity = Vector3.zero
 
-    -- Mantener al jugador "pegado" a la parte hasta detectar el NPC
     local connection
-    local found = false
     local startTime = tick()
 
     connection = RS.Heartbeat:Connect(function()
@@ -146,12 +144,10 @@ local function safeGoTo(data)
             return
         end
 
-        -- Mantener posición y velocidades
         root.CFrame = flightPart.CFrame + Vector3.new(0, 2.8, 0)
         root.AssemblyLinearVelocity = Vector3.zero
         root.AssemblyAngularVelocity = Vector3.new(0, 999, 0)
 
-        -- Buscar NPC
         local npc, pos = findHomeNPC(root)
         if npc and pos then
             local line = string.format("%s → Vector3.new(%.1f, %.1f, %.1f)", npc.Name, pos.X, pos.Y, pos.Z)
@@ -163,7 +159,6 @@ local function safeGoTo(data)
                 table.insert(results, line)
                 updateBox()
             end
-            found = true
             info.Text = data.N .. " ✓ Encontrado"
             connection:Disconnect()
         elseif tick() - startTime > 14 then
@@ -172,12 +167,10 @@ local function safeGoTo(data)
         end
     end)
 
-    -- Esperar a que termine
     while connection.Connected do
         task.wait(0.1)
     end
 
-    -- Restaurar
     hum.PlatformStand = false
     hum:ChangeState(Enum.HumanoidStateType.GettingUp)
     setCollisions(char, true)
@@ -188,7 +181,6 @@ local function safeGoTo(data)
     isBusy = false
 end
 
--- ==================== Botones ====================
 local nextBtn = Instance.new("TextButton", f)
 nextBtn.Size = UDim2.new(0, 130, 0, 34)
 nextBtn.Position = UDim2.new(0.5, -145, 1, -48)
