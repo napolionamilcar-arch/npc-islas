@@ -4,158 +4,160 @@ if g:FindFirstChild("HomeScraperUI") then g.HomeScraperUI:Destroy() end
 
 local function getChar()
     local c = p.Character or p.CharacterAdded:Wait()
-    local h = c:WaitForChild("HumanoidRootPart")
-    local hum = c:WaitForChild("Humanoid")
-    return c, h, hum
+    return c, c:WaitForChild("HumanoidRootPart"), c:WaitForChild("Humanoid")
 end
 
+-- Posiciones más precisas (cerca de los spawns reales)
 local islands = {
-    {N="Sea1 Pirate", P=Vector3.new(-1150,10,3500)},
-    {N="Sea1 Marine", P=Vector3.new(-2600,10,2000)},
-    {N="Sea1 Middle", P=Vector3.new(-300,10,1500)},
-    {N="Sea2 Rose", P=Vector3.new(-300,70,1800)},
-    {N="Sea2 Cafe", P=Vector3.new(-380,73,300)},
-    {N="Sea3 Port", P=Vector3.new(-300,30,5500)},
-    {N="Sea3 Mansion", P=Vector3.new(-12550,340,-10500)},
-    {N="Sea3 Castle", P=Vector3.new(-5500,320,-6000)}
+    {N = "Sea1 Pirate Starter", P = Vector3.new(-1245, 7, 3450)},
+    {N = "Sea1 Marine Starter", P = Vector3.new(-2605, 7, 2045)},
+    {N = "Sea1 Middle Town",    P = Vector3.new(-290, 7, 1580)},
+    {N = "Sea2 Kingdom Rose",   P = Vector3.new(-390, 73, 300)},   -- Café
+    {N = "Sea2 Docks",          P = Vector3.new( -50, 20, 2850)},
+    {N = "Sea3 Port Town",      P = Vector3.new(-610, 58, 6436)},
+    {N = "Sea3 Mansion",        P = Vector3.new(-12550, 337, -10450)},
+    {N = "Sea3 Castle",         P = Vector3.new(-5500, 314, -2800)},
 }
 
-local r, i = {}, 1
+local results, index = {}, 1
 
+-- UI
 local s = Instance.new("ScreenGui", g)
 s.Name = "HomeScraperUI"
 s.ResetOnSpawn = false
 
 local f = Instance.new("Frame", s)
-f.Size = UDim2.new(0, 420, 0, 360)
-f.Position = UDim2.new(0.5, -210, 0.5, -180)
+f.Size = UDim2.new(0, 440, 0, 380)
+f.Position = UDim2.new(0.5, -220, 0.5, -190)
 f.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
 Instance.new("UICorner", f).CornerRadius = UDim.new(0, 10)
 
-local t = Instance.new("TextLabel", f)
-t.Size = UDim2.new(1, 0, 0, 32)
-t.BackgroundTransparency = 1
-t.Text = "Scraper Puntos"
-t.TextColor3 = Color3.new(1,1,1)
-t.Font = Enum.Font.GothamBold
-t.TextSize = 15
+local title = Instance.new("TextLabel", f)
+title.Size = UDim2.new(1, 0, 0, 34)
+title.BackgroundTransparency = 1
+title.Text = "Scraper Puntos Principales"
+title.TextColor3 = Color3.new(1,1,1)
+title.Font = Enum.Font.GothamBold
+title.TextSize = 16
 
 local info = Instance.new("TextLabel", f)
-info.Size = UDim2.new(1, -16, 0, 24)
-info.Position = UDim2.new(0, 8, 0, 32)
+info.Size = UDim2.new(1, -20, 0, 24)
+info.Position = UDim2.new(0, 10, 0, 34)
 info.BackgroundTransparency = 1
-info.Text = "Listo"
-info.TextColor3 = Color3.fromRGB(180,180,180)
+info.Text = "Listo - Presiona Siguiente"
+info.TextColor3 = Color3.fromRGB(180, 180, 180)
 info.Font = Enum.Font.Gotham
-info.TextSize = 12
+info.TextSize = 13
 info.TextXAlignment = Enum.TextXAlignment.Left
 
-local b = Instance.new("TextBox", f)
-b.Size = UDim2.new(1, -20, 0, 220)
-b.Position = UDim2.new(0, 10, 0, 60)
-b.BackgroundColor3 = Color3.fromRGB(35, 35, 42)
-b.TextColor3 = Color3.fromRGB(220, 220, 220)
-b.Font = Enum.Font.Code
-b.TextSize = 12
-b.MultiLine = true
-b.TextWrapped = true
-b.ClearTextOnFocus = false
-b.TextXAlignment = Enum.TextXAlignment.Left
-b.TextYAlignment = Enum.TextYAlignment.Top
-Instance.new("UICorner", b).CornerRadius = UDim.new(0, 6)
-b.Text = "Sin datos..."
+local box = Instance.new("TextBox", f)
+box.Size = UDim2.new(1, -20, 0, 240)
+box.Position = UDim2.new(0, 10, 0, 62)
+box.BackgroundColor3 = Color3.fromRGB(35, 35, 42)
+box.TextColor3 = Color3.fromRGB(220, 220, 220)
+box.Font = Enum.Font.Code
+box.TextSize = 13
+box.MultiLine = true
+box.TextWrapped = true
+box.ClearTextOnFocus = false
+box.TextXAlignment = Enum.TextXAlignment.Left
+box.TextYAlignment = Enum.TextYAlignment.Top
+Instance.new("UICorner", box).CornerRadius = UDim.new(0, 6)
+box.Text = "Sin datos todavía..."
 
-local function up()
-    b.Text = #r > 0 and table.concat(r, "\n\n") or "Sin datos..."
+local function updateBox()
+    box.Text = #results > 0 and table.concat(results, "\n\n") or "Sin datos todavía..."
 end
 
-local function scan()
-    local n = workspace:FindFirstChild("NPCs")
-    if n then
-        for _, v in pairs(n:GetDescendants()) do
-            if v:IsA("Model") and (v.Name:find("Punto Principal") or v.Name:find("Home")) then
-                local ok, pos = pcall(function() return v:GetPivot().Position end)
-                if ok and pos then
-                    local l = string.format("%s → Vector3.new(%.1f, %.1f, %.1f)", v.Name, pos.X, pos.Y, pos.Z)
-                    local e = false
-                    for _, x in ipairs(r) do if x == l then e = true break end end
-                    if not e then table.insert(r, l) end
+-- Buscar NPC cerca del jugador
+local function findHomeNPC()
+    local npcs = workspace:FindFirstChild("NPCs")
+    if not npcs then return nil end
+
+    for _, v in pairs(npcs:GetDescendants()) do
+        if v:IsA("Model") and (v.Name:find("Punto Principal") or v.Name:find("Home") or v.Name:find("Set Home")) then
+            local ok, pos = pcall(function() return v:GetPivot().Position end)
+            if ok and pos then
+                local dist = (pos - getChar().HumanoidRootPart.Position).Magnitude
+                if dist < 80 then -- solo si está cerca
+                    return v, pos
                 end
             end
         end
     end
-    up()
+    return nil
 end
 
-local function safeTP(pos)
-    local char, h, hum = getChar()
-    local fp = Instance.new("Part")
-    fp.Size = Vector3.new(3, 0.5, 3)
-    fp.Transparency = 1
-    fp.Anchored = true
-    fp.CanCollide = false
-    fp.CanTouch = false
-    fp.CanQuery = false
-    fp.CFrame = CFrame.new(pos + Vector3.new(0, 3, 0))
-    fp.Parent = workspace
+-- Teleport + mantener anclado hasta detectar el NPC
+local function goToIsland(data)
+    local char, hrp, hum = getChar()
 
-    hum.PlatformStand = true
-    hum:ChangeState(Enum.HumanoidStateType.Physics)
+    -- Anclar y teletransportar
+    hrp.Anchored = true
+    hrp.AssemblyLinearVelocity = Vector3.zero
+    hrp.AssemblyAngularVelocity = Vector3.zero
+    hrp.CFrame = CFrame.new(data.P + Vector3.new(0, 5, 0))
 
-    local oc = {}
-    for _, pt in ipairs(char:GetDescendants()) do
-        if pt:IsA("BasePart") then
-            oc[pt] = pt.CanCollide
-            pt.CanCollide = false
+    info.Text = "Esperando NPC en " .. data.N .. "..."
+
+    -- Esperar hasta que aparezca el NPC (máximo 12 segundos)
+    local foundNPC, foundPos
+    local start = tick()
+    while tick() - start < 12 do
+        foundNPC, foundPos = findHomeNPC()
+        if foundNPC then break end
+        task.wait(0.4)
+    end
+
+    if foundNPC and foundPos then
+        local line = string.format("%s → Vector3.new(%.1f, %.1f, %.1f)", foundNPC.Name, foundPos.X, foundPos.Y, foundPos.Z)
+        
+        -- Evitar duplicados
+        local exists = false
+        for _, r in ipairs(results) do
+            if r == line then exists = true break end
         end
+        if not exists then
+            table.insert(results, line)
+            updateBox()
+        end
+        info.Text = data.N .. " ✓ Encontrado"
+    else
+        info.Text = data.N .. " ✗ No se encontró NPC"
     end
 
-    h.CFrame = fp.CFrame + Vector3.new(0, 2.5, 0)
-    h.AssemblyLinearVelocity = Vector3.zero
-    h.AssemblyAngularVelocity = Vector3.zero
-
-    task.wait(0.25)
-
-    hum.PlatformStand = false
-    hum:ChangeState(Enum.HumanoidStateType.GettingUp)
-
-    for pt, c in pairs(oc) do
-        if pt and pt.Parent then pt.CanCollide = c end
-    end
-    fp:Destroy()
+    -- Desanclar
+    task.wait(0.3)
+    hrp.Anchored = false
 end
 
-local nb = Instance.new("TextButton", f)
-nb.Size = UDim2.new(0, 120, 0, 32)
-nb.Position = UDim2.new(0.5, -130, 1, -45)
-nb.BackgroundColor3 = Color3.fromRGB(40, 140, 70)
-nb.Text = "Siguiente"
-nb.TextColor3 = Color3.new(1,1,1)
-nb.Font = Enum.Font.GothamBold
-nb.TextSize = 13
-Instance.new("UICorner", nb).CornerRadius = UDim.new(0, 6)
+-- Botones
+local nextBtn = Instance.new("TextButton", f)
+nextBtn.Size = UDim2.new(0, 130, 0, 34)
+nextBtn.Position = UDim2.new(0.5, -145, 1, -48)
+nextBtn.BackgroundColor3 = Color3.fromRGB(40, 140, 70)
+nextBtn.Text = "Siguiente Isla"
+nextBtn.TextColor3 = Color3.new(1,1,1)
+nextBtn.Font = Enum.Font.GothamBold
+nextBtn.TextSize = 14
+Instance.new("UICorner", nextBtn).CornerRadius = UDim.new(0, 6)
 
-nb.MouseButton1Click:Connect(function()
-    if i > #islands then
-        info.Text = "Terminado"
+nextBtn.MouseButton1Click:Connect(function()
+    if index > #islands then
+        info.Text = "Terminado - Copia las coordenadas"
         return
     end
-    local is = islands[i]
-    info.Text = "Yendo a " .. is.N
-    safeTP(is.P)
-    task.wait(3.5)
-    scan()
-    info.Text = is.N .. " listo"
-    i += 1
+    goToIsland(islands[index])
+    index += 1
 end)
 
-local cb = Instance.new("TextButton", f)
-cb.Size = UDim2.new(0, 90, 0, 32)
-cb.Position = UDim2.new(0.5, 20, 1, -45)
-cb.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
-cb.Text = "Cerrar"
-cb.TextColor3 = Color3.new(1,1,1)
-cb.Font = Enum.Font.GothamBold
-cb.TextSize = 13
-Instance.new("UICorner", cb).CornerRadius = UDim.new(0, 6)
-cb.MouseButton1Click:Connect(function() s:Destroy() end)
+local closeBtn = Instance.new("TextButton", f)
+closeBtn.Size = UDim2.new(0, 100, 0, 34)
+closeBtn.Position = UDim2.new(0.5, 20, 1, -48)
+closeBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
+closeBtn.Text = "Cerrar"
+closeBtn.TextColor3 = Color3.new(1,1,1)
+closeBtn.Font = Enum.Font.GothamBold
+closeBtn.TextSize = 14
+Instance.new("UICorner", closeBtn).CornerRadius = UDim.new(0, 6)
+closeBtn.MouseButton1Click:Connect(function() s:Destroy() end)
