@@ -6,21 +6,21 @@ local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
 ----------------------------------------------------------------
--- CONFIGURACIÓN: Cambia esto según el nombre de tu carpeta en ReplicatedStorage
+-- CONFIGURACIÓN: Ajusta al nombre exacto de tu carpeta raíz en ReplicatedStorage
 ----------------------------------------------------------------
 local NOMBRE_CARPETA_REPLICATED = "NPCs" 
 ----------------------------------------------------------------
 
 -- 1. CREACIÓN DINÁMICA DE LA INTERFAZ DE USUARIO (UI)
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "DevBloxFruitsUI"
+screenGui.Name = "DevBloxFruitsUI_v2"
 screenGui.ResetOnSpawn = false
 
 local frame = Instance.new("Frame")
 frame.Name = "MainFrame"
-frame.Size = UDim2.new(0, 420, 0, 420)
+frame.Size = UDim2.new(0, 440, 0, 450)
 frame.Position = UDim2.new(0, 30, 0, 60)
-frame.BackgroundColor3 = Color3.fromRGB(25, 30, 35)
+frame.BackgroundColor3 = Color3.fromRGB(20, 25, 30)
 frame.BorderSizePixel = 0
 frame.Active = true
 frame.Draggable = true
@@ -28,19 +28,31 @@ frame.Parent = screenGui
 
 local title = Instance.new("TextLabel")
 title.Name = "Title"
-title.Size = UDim2.new(1, 0, 0, 35)
-title.BackgroundColor3 = Color3.fromRGB(35, 45, 55)
-title.Text = "  Coordenadas exactas de NPCs (ReplicatedStorage)"
+title.Size = UDim2.new(1, -80, 0, 35)
+title.BackgroundColor3 = Color3.fromRGB(30, 40, 50)
+title.Text = "  Coordenadas NPCs (ReplicatedStorage)"
 title.TextColor3 = Color3.fromRGB(255, 255, 255)
 title.TextXAlignment = Enum.TextXAlignment.Left
 title.Font = Enum.Font.SourceSansBold
 title.TextSize = 14
 title.Parent = frame
 
+-- Botón para escanear de nuevo si no aparecen al inicio
+local refreshButton = Instance.new("TextButton")
+refreshButton.Name = "RefreshButton"
+refreshButton.Size = UDim2.new(0, 75, 0, 25)
+refreshButton.Position = UDim2.new(1, -78, 0, 5)
+refreshButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
+refreshButton.Text = "Escanear"
+refreshButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+refreshButton.Font = Enum.Font.SourceSansBold
+refreshButton.TextSize = 13
+refreshButton.Parent = frame
+
 local scrollFrame = Instance.new("ScrollingFrame")
 scrollFrame.Name = "ScrollContainer"
-scrollFrame.Size = UDim2.new(1, -10, 1, -45)
-scrollFrame.Position = UDim2.new(0, 5, 0, 40)
+scrollFrame.Size = UDim2.new(1, -10, 1, -50)
+scrollFrame.Position = UDim2.new(0, 5, 0, 45)
 scrollFrame.BackgroundTransparency = 1
 scrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
 scrollFrame.ScrollBarThickness = 8
@@ -48,82 +60,104 @@ scrollFrame.Parent = frame
 
 local listLayout = Instance.new("UIListLayout")
 listLayout.Padding = UDim.new(0, 6)
-listLayout.SortOrder = Enum.SortOrder.LayoutOrder
+listLayout.SortOrder = Enum.SortOrder.Name -- Organiza por nombre alfabéticamente
 listLayout.Parent = scrollFrame
 
 local templateBox = Instance.new("TextBox")
 templateBox.Name = "TemplateBox"
 templateBox.Size = UDim2.new(1, -10, 0, 35)
-templateBox.BackgroundColor3 = Color3.fromRGB(45, 50, 60)
-templateBox.TextColor3 = Color3.fromRGB(85, 255, 120) -- Color verde brillante para código claro
+templateBox.BackgroundColor3 = Color3.fromRGB(40, 45, 55)
+templateBox.TextColor3 = Color3.fromRGB(85, 255, 120)
 templateBox.Font = Enum.Font.Code
-templateBox.TextSize = 12
+templateBox.TextSize = 11
 templateBox.ClearTextOnFocus = false
 templateBox.TextEditable = false
 templateBox.BorderSizePixel = 0
 templateBox.Visible = false
 templateBox.Parent = scrollFrame
 
-local uiCorner = Instance.new("UICorner")
-uiCorner.CornerRadius = UDim.new(0, 6)
-uiCorner.Parent = frame
+-- Bordes redondeados para estética
+Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 6)
+Instance.new("UICorner", refreshButton).CornerRadius = UDim.new(0, 4)
 
--- 2. LÓGICA DE EXTRACCIÓN DE PROPIEDADES (PIVOT Y ATTRIBUTES)
+-- 2. LÓGICA REFORZADA DE EXTRACCIÓN (PROFUNDA)
 local function escanearAtributosYPivot()
-	-- Limpiar UI anterior
+	-- Limpiar elementos anteriores para evitar duplicados
 	for _, child in ipairs(scrollFrame:GetChildren()) do
 		if child:IsA("TextBox") and child ~= templateBox then
 			child:Destroy()
 		end
 	end
 
-	local carpetaSource = ReplicatedStorage:FindFirstChild(NOMBRE_CARPETA_REPLICATED)
+	title.Text = "  Buscando carpeta..."
+	
+	-- Esperar a que la carpeta raíz exista de forma segura en el cliente
+	local carpetaSource = ReplicatedStorage:WaitForChild(NOMBRE_CARPETA_REPLICATED, 5)
 	if not carpetaSource then
-		warn("No se encontró la carpeta '" .. NOMBRE_CARPETA_REPLICATED .. "' en ReplicatedStorage.")
-		title.Text = "  Error: Carpeta no encontrada"
+		title.Text = "  Error: Carpeta '" .. NOMBRE_CARPETA_REPLICATED .. "' no encontrada"
 		return
 	end
 
-	-- Leer cada NPC guardado
-	for _, npc in ipairs(carpetaSource:GetChildren()) do
-		if npc:IsA("Model") then
+	title.Text = "  Procesando múltiples modelos..."
+	local contadorModelos = 0
+
+	-- USAR GETDESCENDANTS: Busca de forma recursiva dentro de CUALQUIER subcarpeta
+	for _, objeto in ipairs(carpetaSource:GetDescendants()) do
+		if objeto:IsA("Model") then
 			local coords = nil
 			local origen = ""
 
-			-- Prioridad 1: Leer el atributo 'FloorPos' visible en tu imagen
-			local floorPosAttr = npc:GetAttribute("FloorPos")
+			-- Filtro 1: Atributo 'FloorPos' (Basado en tu imagen)
+			local floorPosAttr = objeto:GetAttribute("FloorPos")
 			if floorPosAttr and typeof(floorPosAttr) == "Vector3" then
 				coords = floorPosAttr
 				origen = "[FloorPos]"
 			end
 
-			-- Prioridad 2: Si no tiene atributo, leer la propiedad 'WorldPivot' de la imagen
+			-- Filtro 2: Atributo alternativo común 'Position' o 'SpawnPoint'
 			if not coords then
-				local worldPivot = npc.WorldPivot
+				local altAttr = objeto:GetAttribute("Position") or objeto:GetAttribute("SpawnPoint")
+				if altAttr and typeof(altAttr) == "Vector3" then
+					coords = altAttr
+					origen = "[AttrPos]"
+				end
+			end
+
+			-- Filtro 3: Propiedad física de lectura global 'WorldPivot' (Marcada en tu imagen)
+			if not coords then
+				local worldPivot = objeto.WorldPivot
+				-- Validamos que el pivot no esté reseteado en el origen por defecto (0,0,0)
 				if worldPivot and worldPivot.Position.Magnitude > 1 then
 					coords = worldPivot.Position
 					origen = "[WorldPivot]"
 				end
 			end
 
-			-- Si se halló una posición válida, se formatea e inyecta en la UI
+			-- Si logramos extraer datos válidos del modelo actual
 			if coords then
+				contadorModelos = contadorModelos + 1
 				local textoFormateado = string.format("%.2f, %.2f, %.2f", coords.X, coords.Y, coords.Z)
 				
 				local nuevaCaja = templateBox:Clone()
-				nuevaCaja.Name = npc.Name
-				-- Genera el formato listo para copiar y usar en scripts de Lua
-				nuevaCaja.Text = string.format("%s %s = Vector3.new(%s)", origen, npc.Name, textoFormateado)
+				nuevaCaja.Name = objeto.Name
+				-- Formato limpio listo para copiar e insertar directo en tus scripts
+				nuevaCaja.Text = string.format("%s %s = Vector3.new(%s)", origen, objeto.Name, textoFormateado)
 				nuevaCaja.Visible = true
 				nuevaCaja.Parent = scrollFrame
 			end
 		end
 	end
 
-	-- Ajustar dinámicamente el tamaño del scrollbar
-	scrollFrame.CanvasSize = UDim2.new(0, 0, 0, listLayout.AbsoluteContentSize.Y + 15)
+	-- Actualizar título con estadísticas de lo encontrado
+	title.Text = string.format("  Modelos listados: %d", contadorModelos)
+	
+	-- Forzar reajuste de la barra de desplazamiento
+	scrollFrame.CanvasSize = UDim2.new(0, 0, 0, listLayout.AbsoluteContentSize.Y + 20)
 end
 
--- Ejecutar el sistema al iniciar el juego
+-- Conectar el botón manual
+refreshButton.MouseButton1Click:Connect(escanearAtributosYPivot)
+
+-- Ejecución inicial automática al instanciarse la UI
 screenGui.Parent = playerGui
-escanearAtributosYPivot()
+task.spawn(escanearAtributosYPivot)
