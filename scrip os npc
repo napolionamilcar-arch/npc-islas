@@ -1,221 +1,120 @@
+-- LocalScript ubicado en StarterPlayer -> StarterPlayerScripts
+local Workspace = game:GetService("Workspace")
 local Players = game:GetService("Players")
-local RS = game:GetService("RunService")
+
 local player = Players.LocalPlayer
-local pGui = player:WaitForChild("PlayerGui")
+local playerGui = player:WaitForChild("PlayerGui")
 
-if pGui:FindFirstChild("HomeScraperUI") then
-    pGui.HomeScraperUI:Destroy()
-end
+----------------------------------------------------------------
+-- CONFIGURACIÓN: Cambia esto según cómo se llame tu carpeta de NPCs
+----------------------------------------------------------------
+local NOMBRE_CARPETA_NPCS = "NPCs" 
+----------------------------------------------------------------
 
-local function getChar()
-    local char = player.Character or player.CharacterAdded:Wait()
-    local root = char:WaitForChild("HumanoidRootPart")
-    local hum = char:WaitForChild("Humanoid")
-    return char, root, hum
-end
+-- 1. CREACIÓN DINÁMICA DE LA INTERFAZ DE USUARIO (UI)
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "DevPivotUI"
+screenGui.ResetOnSpawn = false
 
--- Solo Sea 1
-local islands = {
-    {N = "Pirate Starter",  P = Vector3.new(-1245, 8, 3450)},
-    {N = "Marine Starter",  P = Vector3.new(-2605, 8, 2045)},
-    {N = "Middle Town",     P = Vector3.new(-290, 8, 1580)},
-    {N = "Jungle",          P = Vector3.new(-1600, 8, 150)},
-    {N = "Pirate Village",  P = Vector3.new(-1145, 8, 3820)},
-    {N = "Desert",          P = Vector3.new(1094, 8, 4190)},
-    {N = "Frozen Village",  P = Vector3.new(1198, 30, -1210)},
-    {N = "Marine Fortress", P = Vector3.new(-4505, 20, 4260)},
-    {N = "Skylands",        P = Vector3.new(-4970, 720, -2620)},
-    {N = "Prison",          P = Vector3.new(4850, 8, 735)},
-    {N = "Colosseum",       P = Vector3.new(-1428, 8, -3014)},
-    {N = "Magma Village",   P = Vector3.new(-5290, 10, 8500)},
-    {N = "Fountain City",   P = Vector3.new(5250, 10, 4050)},
-}
+-- Contenedor principal de la lista
+local frame = Instance.new("Frame")
+frame.Name = "MainFrame"
+frame.Size = UDim2.new(0, 350, 0, 400)
+frame.Position = UDim2.new(0, 20, 0, 50) -- Esquina superior izquierda
+frame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+frame.BorderSizePixel = 0
+frame.Active = true
+frame.Draggable = true -- Te permite arrastrar la ventana por la pantalla
+frame.Parent = screenGui
 
-local results = {}
-local index = 1
-local isBusy = false
-
--- UI
-local sg = Instance.new("ScreenGui", pGui)
-sg.Name = "HomeScraperUI"
-sg.ResetOnSpawn = false
-
-local f = Instance.new("Frame", sg)
-f.Size = UDim2.new(0, 440, 0, 380)
-f.Position = UDim2.new(0.5, -220, 0.5, -190)
-f.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
-Instance.new("UICorner", f).CornerRadius = UDim.new(0, 10)
-
-local title = Instance.new("TextLabel", f)
-title.Size = UDim2.new(1, 0, 0, 34)
-title.BackgroundTransparency = 1
-title.Text = "Scraper Puntos - Sea 1"
-title.TextColor3 = Color3.new(1,1,1)
-title.Font = Enum.Font.GothamBold
+-- Título de la ventana
+local title = Instance.new("TextLabel")
+title.Name = "Title"
+title.Size = UDim2.new(1, 0, 0, 30)
+title.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+title.Text = "  Coordenadas Pivot de NPCs (Haz Ctrl+C)"
+title.TextColor3 = Color3.fromRGB(255, 255, 255)
+title.TextXAlignment = Enum.TextXAlignment.Left
+title.Font = Enum.Font.SourceSansBold
 title.TextSize = 16
+title.Parent = frame
 
-local info = Instance.new("TextLabel", f)
-info.Size = UDim2.new(1, -20, 0, 24)
-info.Position = UDim2.new(0, 10, 0, 34)
-info.BackgroundTransparency = 1
-info.Text = "Listo - Presiona Siguiente"
-info.TextColor3 = Color3.fromRGB(180,180,180)
-info.Font = Enum.Font.Gotham
-info.TextSize = 13
-info.TextXAlignment = Enum.TextXAlignment.Left
+-- Contenedor con Scroll para la lista de coordenadas
+local scrollFrame = Instance.new("ScrollingFrame")
+scrollFrame.Name = "ScrollContainer"
+scrollFrame.Size = UDim2.new(1, -10, 1, -40)
+scrollFrame.Position = UDim2.new(0, 5, 0, 35)
+scrollFrame.BackgroundTransparency = 1
+scrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+scrollFrame.ScrollBarThickness = 8
+scrollFrame.Parent = frame
 
-local box = Instance.new("TextBox", f)
-box.Size = UDim2.new(1, -20, 0, 240)
-box.Position = UDim2.new(0, 10, 0, 62)
-box.BackgroundColor3 = Color3.fromRGB(35, 35, 42)
-box.TextColor3 = Color3.fromRGB(220, 220, 220)
-box.Font = Enum.Font.Code
-box.TextSize = 13
-box.MultiLine = true
-box.TextWrapped = true
-box.ClearTextOnFocus = false
-box.TextXAlignment = Enum.TextXAlignment.Left
-box.TextYAlignment = Enum.TextYAlignment.Top
-Instance.new("UICorner", box).CornerRadius = UDim.new(0, 6)
-box.Text = "Sin datos todavía..."
+-- Organizador automático vertical
+local listLayout = Instance.new("UIListLayout")
+listLayout.Padding = UDim.new(0, 5)
+listLayout.SortOrder = Enum.SortOrder.LayoutOrder
+listLayout.Parent = scrollFrame
 
-local function updateBox()
-    box.Text = #results > 0 and table.concat(results, "\n\n") or "Sin datos todavía..."
+-- Plantilla de TextBox para clonar
+local templateBox = Instance.new("TextBox")
+templateBox.Name = "TemplateBox"
+templateBox.Size = UDim2.new(1, -10, 0, 30)
+templateBox.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+templateBox.TextColor3 = Color3.fromRGB(230, 230, 230)
+templateBox.Font = Enum.Font.SourceSans
+templateBox.TextSize = 14
+templateBox.ClearTextOnFocus = false -- Evita que se borre al hacer clic
+templateBox.TextEditable = false      -- El jugador no puede modificarlo, solo copiarlo
+templateBox.BorderSizePixel = 0
+templateBox.Visible = false
+templateBox.Parent = scrollFrame
+
+-- Añadir esquinas redondeadas estéticas
+local uiCorner = Instance.new("UICorner")
+uiCorner.CornerRadius = UDim.new(0, 5)
+uiCorner.Parent = frame
+
+-- 2. LÓGICA PARA ESCANEAR PIVOTS Y LLENAR LA UI
+local function cargarCoordenadasNPCs()
+	-- Limpiar elementos generados anteriormente
+	for _, child in ipairs(scrollFrame:GetChildren()) do
+		if child:IsA("TextBox") and child ~= templateBox then
+			child:Destroy()
+		end
+	end
+
+	-- Buscar la carpeta en el Workspace
+	local carpetaNPCs = Workspace:FindFirstChild(NOMBRE_CARPETA_NPCS)
+	if not carpetaNPCs then
+		warn("No se encontró la carpeta '" .. NOMBRE_CARPETA_NPCS .. "' en el Workspace.")
+		title.Text = "  Error: Carpeta '" .. NOMBRE_CARPETA_NPCS .. "' no encontrada"
+		return
+	end
+
+	-- Leer cada objeto dentro de la carpeta
+	for _, objeto in ipairs(carpetaNPCs:GetChildren()) do
+		-- Verificamos si es un Modelo (los NPCs suelen ser Modelos)
+		if objeto:IsA("Model") then
+			-- Obtener el CFrame del Pivot del modelo completo
+			local pivotCFrame = objeto:GetPivot()
+			local pos = pivotCFrame.Position
+			
+			-- Formatear las coordenadas de forma limpia (X, Y, Z) con 2 decimales
+			local textoCoordenadas = string.format("%.2f, %.2f, %.2f", pos.X, pos.Y, pos.Z)
+			
+			-- Clonar y configurar la caja de texto
+			local nuevaCaja = templateBox:Clone()
+			nuevaCaja.Name = objeto.Name
+			nuevaCaja.Text = objeto.Name .. " = Vector3.new(" .. textoCoordenadas .. ")"
+			nuevaCaja.Visible = true
+			nuevaCaja.Parent = scrollFrame
+		end
+	end
+	
+	-- Ajustar automáticamente el tamaño del scroll según la cantidad de NPCs
+	scrollFrame.CanvasSize = UDim2.new(0, 0, 0, listLayout.AbsoluteContentSize.Y + 10)
 end
 
-local function setCollisions(char, enable)
-    for _, part in ipairs(char:GetDescendants()) do
-        if part:IsA("BasePart") then
-            part.CanCollide = enable
-        end
-    end
-end
-
-local function findHomeNPC(root)
-    local npcs = workspace:FindFirstChild("NPCs")
-    if not npcs then return nil end
-    for _, v in pairs(npcs:GetDescendants()) do
-        if v:IsA("Model") and (v.Name:find("Punto Principal") or v.Name:find("Home") or v.Name:find("Set Home")) then
-            local ok, pos = pcall(function() return v:GetPivot().Position end)
-            if ok and pos and (pos - root.Position).Magnitude < 100 then
-                return v, pos
-            end
-        end
-    end
-    return nil
-end
-
-local function safeGoTo(data)
-    if isBusy then return end
-    isBusy = true
-
-    local char, root, hum = getChar()
-    info.Text = "Yendo a " .. data.N
-
-    -- Crear parte en la posición de destino
-    local flightPart = Instance.new("Part")
-    flightPart.Size = Vector3.new(4, 1, 4)
-    flightPart.Transparency = 1
-    flightPart.Anchored = true
-    flightPart.CanCollide = false
-    flightPart.CanTouch = false
-    flightPart.CanQuery = false
-    flightPart.CFrame = CFrame.new(data.P + Vector3.new(0, 5, 0))
-    flightPart.Parent = workspace
-
-    -- Estado físico
-    hum.PlatformStand = true
-    hum:ChangeState(Enum.HumanoidStateType.Physics)
-    setCollisions(char, false)
-
-    -- Forzar movimiento varias veces al inicio
-    for i = 1, 8 do
-        root.CFrame = flightPart.CFrame + Vector3.new(0, 3, 0)
-        root.AssemblyLinearVelocity = Vector3.zero
-        root.AssemblyAngularVelocity = Vector3.zero
-        char:PivotTo(flightPart.CFrame + Vector3.new(0, 3, 0))
-        task.wait(0.03)
-    end
-
-    local connection
-    local startTime = tick()
-
-    connection = RS.Heartbeat:Connect(function()
-        if not flightPart or not flightPart.Parent or not root or not root.Parent then
-            if connection then connection:Disconnect() end
-            return
-        end
-
-        -- Forzar posición constantemente
-        local targetCF = flightPart.CFrame + Vector3.new(0, 3, 0)
-        root.CFrame = targetCF
-        root.AssemblyLinearVelocity = Vector3.zero
-        root.AssemblyAngularVelocity = Vector3.new(0, 999, 0)
-        pcall(function() char:PivotTo(targetCF) end)
-
-        local npc, pos = findHomeNPC(root)
-        if npc and pos then
-            local line = string.format("%s → Vector3.new(%.1f, %.1f, %.1f)", npc.Name, pos.X, pos.Y, pos.Z)
-            local exists = false
-            for _, r in ipairs(results) do
-                if r == line then exists = true break end
-            end
-            if not exists then
-                table.insert(results, line)
-                updateBox()
-            end
-            info.Text = data.N .. " ✓ Encontrado"
-            connection:Disconnect()
-        elseif tick() - startTime > 12 then
-            info.Text = data.N .. " ✗ Tiempo agotado"
-            connection:Disconnect()
-        end
-    end)
-
-    while connection and connection.Connected do
-        task.wait(0.1)
-    end
-
-    -- Restaurar
-    hum.PlatformStand = false
-    hum:ChangeState(Enum.HumanoidStateType.GettingUp)
-    setCollisions(char, true)
-    root.AssemblyLinearVelocity = Vector3.zero
-    root.AssemblyAngularVelocity = Vector3.zero
-    if flightPart then flightPart:Destroy() end
-
-    isBusy = false
-end
-
-local nextBtn = Instance.new("TextButton", f)
-nextBtn.Size = UDim2.new(0, 130, 0, 34)
-nextBtn.Position = UDim2.new(0.5, -145, 1, -48)
-nextBtn.BackgroundColor3 = Color3.fromRGB(40, 140, 70)
-nextBtn.Text = "Siguiente Isla"
-nextBtn.TextColor3 = Color3.new(1,1,1)
-nextBtn.Font = Enum.Font.GothamBold
-nextBtn.TextSize = 14
-Instance.new("UICorner", nextBtn).CornerRadius = UDim.new(0, 6)
-
-nextBtn.MouseButton1Click:Connect(function()
-    if index > #islands then
-        info.Text = "Terminado - Copia las coordenadas"
-        return
-    end
-    if isBusy then return end
-    safeGoTo(islands[index])
-    index += 1
-end)
-
-local closeBtn = Instance.new("TextButton", f)
-closeBtn.Size = UDim2.new(0, 100, 0, 34)
-closeBtn.Position = UDim2.new(0.5, 20, 1, -48)
-closeBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
-closeBtn.Text = "Cerrar"
-closeBtn.TextColor3 = Color3.new(1,1,1)
-closeBtn.Font = Enum.Font.GothamBold
-closeBtn.TextSize = 14
-Instance.new("UICorner", closeBtn).CornerRadius = UDim.new(0, 6)
-closeBtn.MouseButton1Click:Connect(function()
-    sg:Destroy()
-end)
+-- Montar la UI en la pantalla del jugador y ejecutar
+screenGui.Parent = playerGui
+cargarCoordenadasNPCs()
