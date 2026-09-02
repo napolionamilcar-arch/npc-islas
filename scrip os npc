@@ -14,22 +14,21 @@ local function getChar()
     return char, root, hum
 end
 
--- Solo islas del Sea 1
+-- Solo Sea 1
 local islands = {
-    {N = "Pirate Starter",     P = Vector3.new(-1245, 8, 3450)},
-    {N = "Marine Starter",     P = Vector3.new(-2605, 8, 2045)},
-    {N = "Middle Town",        P = Vector3.new(-290, 8, 1580)},
-    {N = "Jungle",             P = Vector3.new(-1600, 8, 150)},
-    {N = "Pirate Village",     P = Vector3.new(-1145, 8, 3820)},
-    {N = "Desert",             P = Vector3.new(1094, 8, 4190)},
-    {N = "Frozen Village",     P = Vector3.new(1198, 30, -1210)},
-    {N = "Marine Fortress",    P = Vector3.new(-4505, 20, 4260)},
-    {N = "Skylands",           P = Vector3.new(-4970, 720, -2620)},
-    {N = "Prison",             P = Vector3.new(4850, 8, 735)},
-    {N = "Colosseum",          P = Vector3.new(-1428, 8, -3014)},
-    {N = "Magma Village",      P = Vector3.new(-5290, 10, 8500)},
-    {N = "Underwater City",    P = Vector3.new(61150, 20, 1700)},
-    {N = "Fountain City",      P = Vector3.new(5250, 10, 4050)},
+    {N = "Pirate Starter",  P = Vector3.new(-1245, 8, 3450)},
+    {N = "Marine Starter",  P = Vector3.new(-2605, 8, 2045)},
+    {N = "Middle Town",     P = Vector3.new(-290, 8, 1580)},
+    {N = "Jungle",          P = Vector3.new(-1600, 8, 150)},
+    {N = "Pirate Village",  P = Vector3.new(-1145, 8, 3820)},
+    {N = "Desert",          P = Vector3.new(1094, 8, 4190)},
+    {N = "Frozen Village",  P = Vector3.new(1198, 30, -1210)},
+    {N = "Marine Fortress", P = Vector3.new(-4505, 20, 4260)},
+    {N = "Skylands",        P = Vector3.new(-4970, 720, -2620)},
+    {N = "Prison",          P = Vector3.new(4850, 8, 735)},
+    {N = "Colosseum",       P = Vector3.new(-1428, 8, -3014)},
+    {N = "Magma Village",   P = Vector3.new(-5290, 10, 8500)},
+    {N = "Fountain City",   P = Vector3.new(5250, 10, 4050)},
 }
 
 local results = {}
@@ -51,7 +50,7 @@ local title = Instance.new("TextLabel", f)
 title.Size = UDim2.new(1, 0, 0, 34)
 title.BackgroundTransparency = 1
 title.Text = "Scraper Puntos - Sea 1"
-title.TextColor3 = Color3.new(1, 1, 1)
+title.TextColor3 = Color3.new(1,1,1)
 title.Font = Enum.Font.GothamBold
 title.TextSize = 16
 
@@ -60,7 +59,7 @@ info.Size = UDim2.new(1, -20, 0, 24)
 info.Position = UDim2.new(0, 10, 0, 34)
 info.BackgroundTransparency = 1
 info.Text = "Listo - Presiona Siguiente"
-info.TextColor3 = Color3.fromRGB(180, 180, 180)
+info.TextColor3 = Color3.fromRGB(180,180,180)
 info.Font = Enum.Font.Gotham
 info.TextSize = 13
 info.TextXAlignment = Enum.TextXAlignment.Left
@@ -95,15 +94,11 @@ end
 local function findHomeNPC(root)
     local npcs = workspace:FindFirstChild("NPCs")
     if not npcs then return nil end
-
     for _, v in pairs(npcs:GetDescendants()) do
         if v:IsA("Model") and (v.Name:find("Punto Principal") or v.Name:find("Home") or v.Name:find("Set Home")) then
             local ok, pos = pcall(function() return v:GetPivot().Position end)
-            if ok and pos then
-                local dist = (pos - root.Position).Magnitude
-                if dist < 90 then
-                    return v, pos
-                end
+            if ok and pos and (pos - root.Position).Magnitude < 100 then
+                return v, pos
             end
         end
     end
@@ -117,36 +112,46 @@ local function safeGoTo(data)
     local char, root, hum = getChar()
     info.Text = "Yendo a " .. data.N
 
+    -- Crear parte en la posición de destino
     local flightPart = Instance.new("Part")
-    flightPart.Size = Vector3.new(4, 0.5, 4)
+    flightPart.Size = Vector3.new(4, 1, 4)
     flightPart.Transparency = 1
     flightPart.Anchored = true
     flightPart.CanCollide = false
     flightPart.CanTouch = false
     flightPart.CanQuery = false
-    flightPart.CFrame = CFrame.new(data.P + Vector3.new(0, 4, 0))
+    flightPart.CFrame = CFrame.new(data.P + Vector3.new(0, 5, 0))
     flightPart.Parent = workspace
 
+    -- Estado físico
     hum.PlatformStand = true
     hum:ChangeState(Enum.HumanoidStateType.Physics)
     setCollisions(char, false)
 
-    root.CFrame = flightPart.CFrame + Vector3.new(0, 2.8, 0)
-    root.AssemblyLinearVelocity = Vector3.zero
-    root.AssemblyAngularVelocity = Vector3.zero
+    -- Forzar movimiento varias veces al inicio
+    for i = 1, 8 do
+        root.CFrame = flightPart.CFrame + Vector3.new(0, 3, 0)
+        root.AssemblyLinearVelocity = Vector3.zero
+        root.AssemblyAngularVelocity = Vector3.zero
+        char:PivotTo(flightPart.CFrame + Vector3.new(0, 3, 0))
+        task.wait(0.03)
+    end
 
     local connection
     local startTime = tick()
 
     connection = RS.Heartbeat:Connect(function()
         if not flightPart or not flightPart.Parent or not root or not root.Parent then
-            connection:Disconnect()
+            if connection then connection:Disconnect() end
             return
         end
 
-        root.CFrame = flightPart.CFrame + Vector3.new(0, 2.8, 0)
+        -- Forzar posición constantemente
+        local targetCF = flightPart.CFrame + Vector3.new(0, 3, 0)
+        root.CFrame = targetCF
         root.AssemblyLinearVelocity = Vector3.zero
         root.AssemblyAngularVelocity = Vector3.new(0, 999, 0)
+        pcall(function() char:PivotTo(targetCF) end)
 
         local npc, pos = findHomeNPC(root)
         if npc and pos then
@@ -161,16 +166,17 @@ local function safeGoTo(data)
             end
             info.Text = data.N .. " ✓ Encontrado"
             connection:Disconnect()
-        elseif tick() - startTime > 14 then
+        elseif tick() - startTime > 12 then
             info.Text = data.N .. " ✗ Tiempo agotado"
             connection:Disconnect()
         end
     end)
 
-    while connection.Connected do
+    while connection and connection.Connected do
         task.wait(0.1)
     end
 
+    -- Restaurar
     hum.PlatformStand = false
     hum:ChangeState(Enum.HumanoidStateType.GettingUp)
     setCollisions(char, true)
@@ -186,7 +192,7 @@ nextBtn.Size = UDim2.new(0, 130, 0, 34)
 nextBtn.Position = UDim2.new(0.5, -145, 1, -48)
 nextBtn.BackgroundColor3 = Color3.fromRGB(40, 140, 70)
 nextBtn.Text = "Siguiente Isla"
-nextBtn.TextColor3 = Color3.new(1, 1, 1)
+nextBtn.TextColor3 = Color3.new(1,1,1)
 nextBtn.Font = Enum.Font.GothamBold
 nextBtn.TextSize = 14
 Instance.new("UICorner", nextBtn).CornerRadius = UDim.new(0, 6)
@@ -206,7 +212,7 @@ closeBtn.Size = UDim2.new(0, 100, 0, 34)
 closeBtn.Position = UDim2.new(0.5, 20, 1, -48)
 closeBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
 closeBtn.Text = "Cerrar"
-closeBtn.TextColor3 = Color3.new(1, 1, 1)
+closeBtn.TextColor3 = Color3.new(1,1,1)
 closeBtn.Font = Enum.Font.GothamBold
 closeBtn.TextSize = 14
 Instance.new("UICorner", closeBtn).CornerRadius = UDim.new(0, 6)
