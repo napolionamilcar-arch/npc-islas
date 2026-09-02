@@ -1,120 +1,143 @@
 -- LocalScript ubicado en StarterPlayer -> StarterPlayerScripts
-local Workspace = game:GetService("Workspace")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
 ----------------------------------------------------------------
--- CONFIGURACIÓN: Cambia esto según cómo se llame tu carpeta de NPCs
+-- CONFIGURACIÓN: Cambia esto según tu carpeta en ReplicatedStorage
 ----------------------------------------------------------------
-local NOMBRE_CARPETA_NPCS = "NPCs" 
+local NOMBRE_CARPETA_REPLICATED = "NPCs" 
 ----------------------------------------------------------------
 
 -- 1. CREACIÓN DINÁMICA DE LA INTERFAZ DE USUARIO (UI)
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "DevPivotUI"
+screenGui.Name = "DevReplicatedUI"
 screenGui.ResetOnSpawn = false
 
--- Contenedor principal de la lista
 local frame = Instance.new("Frame")
 frame.Name = "MainFrame"
-frame.Size = UDim2.new(0, 350, 0, 400)
-frame.Position = UDim2.new(0, 20, 0, 50) -- Esquina superior izquierda
-frame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+frame.Size = UDim2.new(0, 380, 0, 400)
+frame.Position = UDim2.new(0, 20, 0, 50)
+frame.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
 frame.BorderSizePixel = 0
 frame.Active = true
-frame.Draggable = true -- Te permite arrastrar la ventana por la pantalla
+frame.Draggable = true
 frame.Parent = screenGui
 
--- Título de la ventana
 local title = Instance.new("TextLabel")
 title.Name = "Title"
-title.Size = UDim2.new(1, 0, 0, 30)
-title.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-title.Text = "  Coordenadas Pivot de NPCs (Haz Ctrl+C)"
+title.Size = UDim2.new(1, 0, 0, 35)
+title.BackgroundColor3 = Color3.fromRGB(45, 45, 60)
+title.Text = "  Coordenadas detectadas en ReplicatedStorage"
 title.TextColor3 = Color3.fromRGB(255, 255, 255)
 title.TextXAlignment = Enum.TextXAlignment.Left
 title.Font = Enum.Font.SourceSansBold
-title.TextSize = 16
+title.TextSize = 15
 title.Parent = frame
 
--- Contenedor con Scroll para la lista de coordenadas
 local scrollFrame = Instance.new("ScrollingFrame")
 scrollFrame.Name = "ScrollContainer"
-scrollFrame.Size = UDim2.new(1, -10, 1, -40)
-scrollFrame.Position = UDim2.new(0, 5, 0, 35)
+scrollFrame.Size = UDim2.new(1, -10, 1, -45)
+scrollFrame.Position = UDim2.new(0, 5, 0, 40)
 scrollFrame.BackgroundTransparency = 1
 scrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
 scrollFrame.ScrollBarThickness = 8
 scrollFrame.Parent = frame
 
--- Organizador automático vertical
 local listLayout = Instance.new("UIListLayout")
 listLayout.Padding = UDim.new(0, 5)
 listLayout.SortOrder = Enum.SortOrder.LayoutOrder
 listLayout.Parent = scrollFrame
 
--- Plantilla de TextBox para clonar
 local templateBox = Instance.new("TextBox")
 templateBox.Name = "TemplateBox"
-templateBox.Size = UDim2.new(1, -10, 0, 30)
-templateBox.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-templateBox.TextColor3 = Color3.fromRGB(230, 230, 230)
-templateBox.Font = Enum.Font.SourceSans
-templateBox.TextSize = 14
-templateBox.ClearTextOnFocus = false -- Evita que se borre al hacer clic
-templateBox.TextEditable = false      -- El jugador no puede modificarlo, solo copiarlo
+templateBox.Size = UDim2.new(1, -10, 0, 32)
+templateBox.BackgroundColor3 = Color3.fromRGB(55, 55, 70)
+templateBox.TextColor3 = Color3.fromRGB(255, 215, 0) -- Color dorado para resaltar
+templateBox.Font = Enum.Font.Code
+templateBox.TextSize = 13
+templateBox.ClearTextOnFocus = false
+templateBox.TextEditable = false
 templateBox.BorderSizePixel = 0
 templateBox.Visible = false
 templateBox.Parent = scrollFrame
 
--- Añadir esquinas redondeadas estéticas
 local uiCorner = Instance.new("UICorner")
-uiCorner.CornerRadius = UDim.new(0, 5)
+uiCorner.CornerRadius = UDim.new(0, 6)
 uiCorner.Parent = frame
 
--- 2. LÓGICA PARA ESCANEAR PIVOTS Y LLENAR LA UI
-local function cargarCoordenadasNPCs()
-	-- Limpiar elementos generados anteriormente
+-- 2. LÓGICA DE DETECCIÓN DE COORDENADAS INTERNAS
+local function buscarCoordenadasEnReplicated()
 	for _, child in ipairs(scrollFrame:GetChildren()) do
 		if child:IsA("TextBox") and child ~= templateBox then
 			child:Destroy()
 		end
 	end
 
-	-- Buscar la carpeta en el Workspace
-	local carpetaNPCs = Workspace:FindFirstChild(NOMBRE_CARPETA_NPCS)
-	if not carpetaNPCs then
-		warn("No se encontró la carpeta '" .. NOMBRE_CARPETA_NPCS .. "' en el Workspace.")
-		title.Text = "  Error: Carpeta '" .. NOMBRE_CARPETA_NPCS .. "' no encontrada"
+	local carpetaSource = ReplicatedStorage:FindFirstChild(NOMBRE_CARPETA_REPLICATED)
+	if not carpetaSource then
+		warn("No se encontró la carpeta '" .. NOMBRE_CARPETA_REPLICATED .. "' en ReplicatedStorage.")
+		title.Text = "  Error: Carpeta no encontrada en Replicated"
 		return
 	end
 
-	-- Leer cada objeto dentro de la carpeta
-	for _, objeto in ipairs(carpetaNPCs:GetChildren()) do
-		-- Verificamos si es un Modelo (los NPCs suelen ser Modelos)
-		if objeto:IsA("Model") then
-			-- Obtener el CFrame del Pivot del modelo completo
-			local pivotCFrame = objeto:GetPivot()
-			local pos = pivotCFrame.Position
+	-- Escanear los objetos/plantillas guardados
+	for _, npc in ipairs(carpetaSource:GetChildren()) do
+		local coordenadaEncontrada = nil
+		local metodoDeteccion = ""
+
+		-- Método A: Buscar si el juego guarda la posición en un Atributo del modelo
+		if npc:GetAttribute("SpawnPoint") or npc:GetAttribute("Position") or npc:GetAttribute("CFrame") then
+			local attr = npc:GetAttribute("SpawnPoint") or npc:GetAttribute("Position") or npc:GetAttribute("CFrame")
+			if typeof(attr) == "Vector3" then
+				coordenadaEncontrada = attr
+			elseif typeof(attr) == "CFrame" then
+				coordenadaEncontrada = attr.Position
+			end
+			metodoDeteccion = "[Attr]"
+		end
+
+		-- Método B: Buscar si tiene un objeto interno de tipo Vector3Value o CFrameValue
+		if not coordenadaEncontrada then
+			local valorPos = npc:FindFirstChildOfClass("Vector3Value") or npc:FindFirstChild("Position") or npc:FindFirstChild("Spawn")
+			local valorCF = npc:FindFirstChildOfClass("CFrameValue") or npc:FindFirstChild("CFrame")
+
+			if valorPos and valorPos:IsA("Vector3Value") then
+				coordenadaEncontrada = valorPos.Value
+				metodoDeteccion = "[Value]"
+			elseif valorCF and valorCF:IsA("CFrameValue") then
+				coordenadaEncontrada = valorCF.Value.Position
+				metodoDeteccion = "[CFrameV]"
+			end
+		end
+
+		-- Método C: Si es un clon de mapa que conserva su Pivot original de guardado
+		if not coordenadaEncontrada then
+			local pivot = npc:GetPivot()
+			-- Evitamos la coordenada por defecto (0,0,0) que tienen los modelos vacíos
+			if pivot.Position.Magnitude > 1 then
+				coordenadaEncontrada = pivot.Position
+				metodoDeteccion = "[Pivot]"
+			end
+		end
+
+		-- Si logramos extraer una coordenada válida, la añadimos a la interfaz
+		if coordenadaEncontrada then
+			local textoFinal = string.format("%.2f, %.2f, %.2f", coordenadaEncontrada.X, coordenadaEncontrada.Y, coordenadaEncontrada.Z)
 			
-			-- Formatear las coordenadas de forma limpia (X, Y, Z) con 2 decimales
-			local textoCoordenadas = string.format("%.2f, %.2f, %.2f", pos.X, pos.Y, pos.Z)
-			
-			-- Clonar y configurar la caja de texto
 			local nuevaCaja = templateBox:Clone()
-			nuevaCaja.Name = objeto.Name
-			nuevaCaja.Text = objeto.Name .. " = Vector3.new(" .. textoCoordenadas .. ")"
+			nuevaCaja.Name = npc.Name
+			nuevaCaja.Text = string.format("%s %s = Vector3.new(%s)", metodoDeteccion, npc.Name, textoFinal)
 			nuevaCaja.Visible = true
 			nuevaCaja.Parent = scrollFrame
 		end
 	end
-	
-	-- Ajustar automáticamente el tamaño del scroll según la cantidad de NPCs
+
 	scrollFrame.CanvasSize = UDim2.new(0, 0, 0, listLayout.AbsoluteContentSize.Y + 10)
 end
 
--- Montar la UI en la pantalla del jugador y ejecutar
+-- Ejecutar
 screenGui.Parent = playerGui
-cargarCoordenadasNPCs()
+buscarCoordenadasEnReplicated()
